@@ -1,15 +1,23 @@
 "use client";
 
+import Fuse from "fuse.js";
 import {useEffect, useState} from "react";
-import {TextArea, Button, Card, Spinner, Label} from "@heroui/react";
+import {TextArea, Button, Card, Spinner, Label, SearchField, Description} from "@heroui/react";
 import {Image} from "@heroui/image";
-import {FaCheck, FaCheckCircle} from "react-icons/fa";
-import {FaMagnifyingGlass, FaSquareCheck} from "react-icons/fa6";
+import {FaCheck, FaCheckCircle, FaMemory} from "react-icons/fa";
+import {FaMagnifyingGlass, FaTag, FaSquareCheck} from "react-icons/fa6";
+import {BiCategory, BiRename, BiSolidRename} from "react-icons/bi";
+import {BsAspectRatioFill, BsGpuCard} from "react-icons/bs";
+import {IoMdResize} from "react-icons/io";
+import {IoDocumentText} from "react-icons/io5";
+import {LuCpu} from "react-icons/lu";
+import {MdOutlineStorage} from "react-icons/md";
 
 export default function Home() {
     const [tagsInput, setTagsInput] = useState("");
     const [loading, setLoading] = useState(false);
     const [results, setResults] = useState([]);
+    const [searchTerm, setSearchTerm] = useState("");
 
     const handleLookup = async () => {
         setLoading(true);
@@ -32,7 +40,6 @@ export default function Home() {
             let buffer = "";
 
 
-
             while (true) {
                 const {done, value} = await reader.read();
                 if (done) break;
@@ -45,7 +52,6 @@ export default function Home() {
                     if (line.startsWith("data: ")) {
                         try {
                             const result = JSON.parse(line.slice(6));
-                            console.log(result);
 
                             // Enrich each Dell result with Snipe-IT status
                             /*const snipe = await snipeITStatus(result.serviceTag);
@@ -89,6 +95,17 @@ export default function Home() {
             console.error(err);
         }
     };*/
+
+    const fuse = results.length > 0
+        ? new Fuse(results, {
+            keys: ['assetName', 'serviceTag', 'category', 'cpu', 'memory', 'storage', 'gpu', 'size'],
+            threshold: 0.3, // Controls fuzzy matching sensitivity (0 = exact, 1 = very fuzzy)
+        })
+        : null
+
+    const filteredResults = searchTerm.trim() === ''
+        ? results
+        : fuse?.search(searchTerm).map(result => result.item) || [];
 
     return (
         <div className="mx-auto p-6 flex flex-col gap-6 w-4/5 md:w-1/2 ">
@@ -139,52 +156,69 @@ export default function Home() {
                     <FaCheck color="green" size={20} className="mb-1"/>
                 )}
             </div>
-            {results.map((r, i) => (
+
+            <SearchField name="search" value={searchTerm} onChange={(value) => setSearchTerm(value)}>
+                <Label>Search results</Label>
+                <SearchField.Group>
+                    <SearchField.SearchIcon/>
+                    <SearchField.Input placeholder="Search something"/>
+                    <SearchField.ClearButton/>
+                </SearchField.Group>
+                <Description>{filteredResults.length} of {results.length} results</Description>
+            </SearchField>
+
+            {filteredResults.map((r, i) => (
                 <Card key={`${r.serviceTag}-${i}`}>
                     <Card.Content>
                         <table className="w-full text-sm ">
                             <tbody>
                             <tr>
-                                <td className="font-semibold pr-4 py-1 w-min whitespace-nowrap">Category</td>
+                                <td className="flex flex-row gap-1 font-semibold pr-4 py-1 w-min whitespace-nowrap"><BiCategory size={18}/> Category</td>
                                 <td className="w-full">{r.category}</td>
                             </tr>
                             <tr>
-                                <td className="font-semibold pr-4 py-1 w-min whitespace-nowrap">Service Tag</td>
+                                <td className="flex flex-row gap-1 font-semibold pr-4 py-1 w-min whitespace-nowrap"><FaTag size={18}/>Service Tag</td>
                                 <td className="w-full">{r.serviceTag}</td>
                             </tr>
                             <tr>
-                                <td className="font-semibold pr-4 py-1 w-min whitespace-nowrap">Name</td>
+                                <td className="flex flex-row gap-1 font-semibold pr-4 py-1 w-min whitespace-nowrap"><BiSolidRename size={18}/>Name</td>
                                 <td className="w-full">{r.assetName}</td>
                             </tr>
                             {/* Only show these fields if it's a notebook */}
                             {r.category === "Notebook" && (
                                 <>
                                     <tr>
-                                        <td className="font-semibold pr-4 py-1">CPU</td>
+                                        <td className="flex flex-row gap-1 font-semibold pr-4 py-1"><LuCpu size={18}/>CPU</td>
                                         <td>{r.cpu}</td>
                                     </tr>
                                     <tr>
-                                        <td className="font-semibold pr-4 py-1">Memory</td>
+                                        <td className="flex flex-row gap-1 font-semibold pr-4 py-1"><FaMemory size={18}/>Memory</td>
                                         <td>{r.memory}</td>
                                     </tr>
                                     <tr>
-                                        <td className="font-semibold pr-4 py-1">Storage</td>
+                                        <td className="flex flex-row gap-1 font-semibold pr-4 py-1"><MdOutlineStorage size={18}/>Storage</td>
                                         <td>{r.storage}</td>
                                     </tr>
                                     <tr>
-                                        <td className="font-semibold pr-4 py-1">GPU</td>
+                                        <td className="flex flex-row gap-1 font-semibold pr-4 py-1"><BsGpuCard size={18}/>GPU</td>
                                         <td>{r.gpu}</td>
                                     </tr>
                                 </>
                             )}
-                            {r.category === "Notebook" || r.category === "Display" && (
-                                <tr>
-                                    <td className="font-semibold pr-4 py-1">Size</td>
-                                    <td>{r.size}</td>
-                                </tr>
+                            {(r.category === "Notebook" || r.category === "Display") && (
+                                <>
+                                    <tr>
+                                        <td className="flex flex-row gap-1 font-semibold pr-4 py-1"><BsAspectRatioFill size={18}/>Aspect Ratio</td>
+                                        <td>{r.aspectRatio}</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="flex flex-row gap-1 font-semibold pr-4 py-1"><IoMdResize size={18}/>Size</td>
+                                        <td>{r.size}</td>
+                                    </tr>
+                                </>
                             )}
                             <tr>
-                                <td className="font-semibold pr-4 py-1 w-min whitespace-nowrap">Warranty Start</td>
+                                <td className="flex flex-row gap-1 font-semibold pr-4 py-1 w-min whitespace-nowrap"><IoDocumentText size={18}/>Warranty Start</td>
                                 <td className="w-full">{r.warrantyStart}</td>
                             </tr>
                             </tbody>

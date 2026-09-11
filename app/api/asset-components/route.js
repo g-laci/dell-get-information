@@ -54,6 +54,7 @@ function parseDellAsset(warranty, asset) {
         cpu: null,
         gpu: null,
         size: null,
+        aspectRatio: null,
     };
 
     const lob = warranty.productLobDescription?.toLowerCase() || "";
@@ -65,21 +66,38 @@ function parseDellAsset(warranty, asset) {
 
     if (asset?.components?.length) {
         for (const comp of asset.components) {
-            const desc = comp.itemDescription?.toLowerCase() || "";
+            const itemDescription = comp.itemDescription?.toLowerCase() || "";
+            const partDescription = comp.partDescription?.toLowerCase() || "";
             const itemNumber = comp.itemNumber || ""
+            if (!result.size) {
+                // Try quote pattern first
+                let match = itemDescription.match(/(\d{2}\.?(\d)?\s*")/);
 
-            if (!result.size && /"/.test(desc)) {
-                const match = desc.match(/(\d{2}\.?(\d)?\s*")/);
-                if (match) result.size = match[1];
+                // Try LCD pattern if no quote found
+                if (!match) {
+                    match = partDescription.match(/lcd,\s*(\d{2}(?:\.\d)?)/i);
+                }
+
+                if (match) result.size = match[1]
+            }
+            if (!result.aspectRatio) {
+                // Try to find common aspect ratios: 16:9, 16:10, 4:3, 21:9, etc.
+                let match = itemDescription.match(/(\d{1,2}):(\d{1,2})/);
+
+                if (!match) {
+                    match = partDescription.match(/(\d{1,2}):(\d{1,2})/);
+                }
+
+                if (match) result.aspectRatio = match[0];  // match[0] = full match like "16:9"
             }
 
-            if (!result.cpu && itemNumber.includes("379") && /intel|amd/.test(desc)) result.cpu = comp.itemDescription;
-            if (!result.memory && itemNumber.includes("370") && /gb/.test(desc)) result.memory = comp.itemDescription;
-            if (!result.gpu && /graphics|gpu/.test(desc)) result.gpu = comp.itemDescription;
-            if (!result.storage && itemNumber.includes("400") && /gb/.test(desc)) result.storage = comp.itemDescription;
+            if (!result.cpu && itemNumber.includes("379") && /intel|amd/.test(itemDescription)) result.cpu = comp.itemDescription;
+            if (!result.memory && itemNumber.includes("370") && /gb/.test(itemDescription)) result.memory = comp.itemDescription;
+            if (!result.gpu && /graphics|gpu/.test(itemDescription)) result.gpu = comp.itemDescription;
+            if (!result.storage && itemNumber.includes("400") && /gb/.test(itemDescription)) result.storage = comp.itemDescription;
 
-            if (!result.storage && /ssd|hdd|pciessd|nvme/.test(desc)) {
-                const match = desc.match(/(\d+\s?gb|\d+\s?tb)/i);
+            if (!result.storage && /ssd|hdd|pciessd|nvme/.test(itemDescription)) {
+                const match = itemDescription.match(/(\d+\s?gb|\d+\s?tb)/i);
                 if (match) result.storage = match[1];
             }
         }
